@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Aquarium Control</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular.min.js"></script>
+  <style>
+	.space-around {padding-bottom:10px; padding-left:10px; padding-right:10px;}
+	.float-right {float:right}
+	.text-white {color: #fff !important;}
+	.header {margin-bottom:0px; padding-bottom:5px; padding-top:5px; background-color: transparent;}
+	.navigation {border-bottom: none; background: #343a40; margin-right: -20px; margin-left: -20px;}
+	.sub-navigation {border-bottom: none; background: darkgray; margin-right: -20px; margin-left: -20px; padding-left:50px;}
+
+	a {
+		text-decoration:none;
+		color:gray;
+	}
+	a:active{
+		color:black;
+		background-color:white;
+	}
+	
+	
+	
+	.nav > li > a {
+		border-radius: 0px !important;
+	}
+	.dashed-line
+	{
+		border: 0.01em dashed white;
+	}
+	
+	.login-div {
+		max-width: 400px;
+		border: solid white;
+		margin-top: 30px;
+		border-radius: 10px;
+		background: white;
+		color: black;
+	}
+	
+	</style>
+</style>
+</head>
+<body style="background-color: #030C22 !important;">
+<div ng-app="myApp" ng-controller="myCtrl">
+	<div ng-cloak ng-show="isValidated&&!isAuthorized"  class="container login-div" style="max-width: 400px; padding-top:30px;">
+		<h1 style="text-align:center;">Welcome back!</h1>
+		<br/>
+		<form class="form-signin">
+			<label for="inputEmail">Email address</label>
+			<input class="form-control" id="inputEmail" name="username" ng-model="user" placeholder="UserName" required="true" type="text">
+			<label for="inputPassword">Password</label>
+			<input style="paddin"class="form-control" id="inputPassword" name="password" ng-model="pass" placeholder="Password" required="true" type="password">
+			<br/>
+			<button class="btn btn-lg btn-light btn-block" ng-click="doLogin()" >Log in</button>
+			<br/>
+			<div ng-show="failLogin" class="alert alert-danger" role="alert">
+				Wrong username/password!
+			</div>
+		</form>
+	</div>
+	<div ng-show="isAuthorized" ng-cloak>
+		<div class="jumbotron text-center text-white header">
+		  <h2>{{controllerName}}</h2>
+		  <h5><span>Temp: {{sensorsRead.temperature}} |</span>
+			<span> Ph: {{sensorsRead.ph}} | </span>
+			<span>Water Level: {{sensorsRead.level}} | </span>
+			<a ng-click="doLogout()">Log out</a>
+			</h5>
+		</div>
+		<div class="container text-white">
+			<ul class="nav nav-tabs navigation">
+				<li class="active"><a data-toggle="tab" href="#events">Events</a></li>
+				<li><a data-toggle="tab" href="#manual_control">Manual Control</a></li>
+				<li><a data-toggle="tab" href="#settings">Settings</a></li>
+			</ul>
+			<div class="tab-content">
+				<div id="events" class="tab-pane fade in active">
+					<div style="padding:10px;" class="row">
+						<div ng-show="events" class="col-sm">
+							<p ng-repeat="event in events">{{event.time}} - {{event.event}}</p>
+						</div>
+						<a ng-click="loadMoreEvents()">... load more events</a>
+					</div>
+				</div>
+				
+				<div id="manual_control" class="tab-pane fade">
+					<div style="padding:10px;">
+						<div ng-show="elements" class="col-sm">
+							<div ng-repeat="item in elements" class="row space-around" style="margin-right: 0px; margin-left: 0px; padding-bottom: 5px;">
+								<label class="space-right">{{item.name}}</label>
+								<div class="btn-group float-right">
+									<button type="button" class="btn btn-default" href="/action?pin={{item.pin}}&action=on" ng-click="changeState(item)" ng-disabled="item.status == 'ON'">On</button>
+									<button type="button" class="btn btn-default" href="/action?pin={{item.pin}}&action=off" ng-click="changeState(item)" ng-disabled="item.status == 'OFF'"}}>Off</button>
+								</div>
+							</div>
+							<div ng-show="feeder" class="row space-around " style="margin-right: 0px; margin-left: 0px;">
+								<label class="space-right">{{feeder.name}}</label>
+								<div class="btn-group float-right">
+									<button type="button" class="btn btn-default" href="/action?action={{feeder.action}}" ng-click="doAction(feeder.action)" >Feed Now!</button>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div id="settings" class="tab-pane fade">
+					<div class="row" style="background:darkgray;">
+						<div class ="col-xs-12">
+							<ul class="nav nav-tabs sub-navigation">
+								<li><a data-toggle="tab" href="#general">General</a></li>
+								<li class="active"><a data-toggle="tab" href="#schedules">Schedules</a></li>
+								<li><a data-toggle="tab" href="#rules">Rules</a></li>
+								
+							</ul>
+						</div>
+					</div>
+					<div class="tab-content">
+						<div id="schedules" class="tab-pane fade in active">
+							<div ng-show="elements" class="col-sm">
+								<div style="padding:10px;" class="row">
+									<div class="row">
+										<div class ="col-xs-4">
+										</div>
+										<div class ="col-xs-8">
+											<div class="row">
+												<div class ="col-xs-2">
+												</div>
+												<div class ="col-xs-5">
+													<label>TimeOn</label>
+												</div>
+												<div class ="col-xs-5">
+													<label>TimeOff</label>
+												</div>
+											</div>
+										</div>
+									</div>
+									<div ng-repeat="item in elements" >
+										<div class="row" style="padding-bottom: 5px;">
+											<div class ="col-xs-4" style="padding-right:0px;">
+												<label ng-dblclick="changeEdit()" ng-show="!edit">{{item.name}}</label>
+												<input ng-show="edit" type="text" class="form-control" id="name" ng-model="item.name" name="name">										
+											</div>
+											<div class ="col-xs-8">
+												<div ng-repeat="schedule in item.schedules">
+													<div class="row">
+														<div class ="col-xs-2">
+															<input type="checkbox" id="schedule_used" ng-model="schedule.used" name="schedule_used">
+														</div>
+														<div class ="col-xs-4" style="padding-left:0px;">
+															<input ng-disabled="!schedule.used" type="text" class="form-control" id="tOn_0" ng-model="schedule.timeOn" name="schedule_used_tOn">
+														</div>
+														<div class ="col-xs-4" style="padding-left:0px;">
+															<input ng-disabled="!schedule.used" type="text" class="form-control" id="tOff_0" ng-model="schedule.timeOff" name="schedule_tOff">
+														</div>
+														<div class ="col-xs-2">
+															<button ng-if="!$first" type="button" class="btn btn-danger" ng-click="removeSchedule($index, item)"><b>-</b></button>
+															<button ng-if="$last && $index < 2" type="button" class="btn btn-primary" ng-click="addSchdule(item)"><b>+</b></button>
+														</div>	
+													</div>
+												</div>
+											</div>
+										</div>
+										<div class="row">
+											<hr>
+										</div>																		
+									</div>
+									
+									<div>
+										<div class="row" style="padding-bottom: 5px;">
+											<div class ="col-xs-4" style="padding-right:0px;">
+												<label ng-show="!edit" ng-dblclick="changeEdit()">{{feeder.name}}</label>
+												<input ng-show="edit"type="text" class="form-control" id="name" ng-model="feeder.name" name="name">
+											</div>
+											<div class ="col-xs-8">
+												<div class ="row" ng-repeat="schedule in feeder.schedules">
+													<div class ="col-xs-2">
+														<input type="checkbox" id="used1" ng-model="schedule.used" name="used_feeder">
+													</div>
+													<div class ="col-xs-4" style="padding-left:0px;">
+														<input ng-disabled="!schedule.used" type="text" class="form-control" id="tOne" ng-model="schedule.time" name="feederTime">
+													</div>
+													<div class ="col-xs-4" style="padding-left:0px;">
+														<input ng-disabled="!schedule.used" type="text" class="form-control" id="dOne" ng-model="schedule.duration" name="feederDurationime" placeholder="duration sec">
+													</div>
+													<div class ="col-xs-2" >
+														<button ng-if="!$first" type="button" class="btn btn-danger" ng-click="removeFeeding($index)"><b>-</b></button>
+														<button ng-if="$last && $index < 2" type="button" class="btn btn-primary" ng-click="addFeeding()"><b>+</b></button>
+													</div>
+												</div>
+											</div>
+										</div>								
+									</div>
+								</div>
+							</div>
+						</div>
+						<div id="rules" class="tab-pane fade in">
+							<div style="padding:10px;" class="row">
+								<!-- Feeding rule -->
+								<div class="row" ng-show="feedingRule">
+									<div class ="col-xs-1">
+										<input style="vertical-align:center-left" type="checkbox" id="stopWhileFeeding" ng-model="feedingRule.isStop">
+										<label style="float:right;">1</label>
+									</div>
+									<div class ="form-inline col-xs-11">
+										<label>Stop while feeding</label>
+										<select class="form-control" id="selectFilterPins" multiple
+											ng-model="feedingRule.sockets"
+											ng-options="item.pin as item.name for item in elements">
+										</select>
+										<label> for </label>
+										<input style="width:75px;" type="text" class="form-control" id="feedingStopMinutes" ng-model="feedingRule.stopMinutes" name="feedingStopMinutes">
+										<label>minutes!</label>
+									</div>
+								</div>	
+								<!-- Generic Rules -->
+								<div ng-show="rules">
+									<div ng-repeat="rule in rules">
+										<div class="row">
+											<hr>
+											<div class ="col-xs-1">
+												<input type="checkbox" id="rule_used" ng-model="rule.used"><label style="float:right;">{{useFeeder ? $index+2 : $index+1}}</label>
+											</div>
+											<div class ="form-inline col-xs-9">
+												<select class="form-control" id="rule_action" 
+													ng-model="rule.action"
+													ng-options="action.code as action.name for action in actions"/>										
+												</select>
+												<select class="form-control" id="rule_socket"
+													ng-model="rule.socket"
+													ng-options="item.pin as item.name for item in elements"/>
+												</select>										
+												<label>when</label>
+												<select class="form-control" id="rule_sensor"
+													ng-model="rule.sensor"
+													ng-options="sensor.code as sensor.name for sensor in sensors"/>
+												</select>
+												<select class="form-control" id="rule_operand"
+													ng-model="rule.operand"
+													ng-options="operand.code as operand.name for operand in operands"/>
+												</select>										
+												<input style="width:75px;" type="text" class="form-control" id="rule_value" ng-model="rule.value" name="rule_value">			
+												<label>,</label>
+												<select class="form-control" id="rule_mode"
+													ng-model="rule.mode"
+													ng-options="mode.code as mode.name for mode in modes"/>
+												</select>
+												<label>schedules!</label>										
+											</div>
+											<div class ="col-xs-2">
+												<button ng-if="!$first" type="button" class="btn btn-danger" ng-click="removeRule($index)"><b>-</b></button>
+												<button ng-if="$last && $index < 18" type="button" class="btn btn-primary" ng-click="addRule()"><b>+</b></button>
+											</div>									
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div id="general" class="tab-pane fade in">
+							<div style="padding:10px;" class="row">
+								<div class="row">
+									<div class="form-inline col-xs-12">
+										<label>Application display name: </label>
+										<input type="text" class="form-control" id="controllerName" ng-model="controllerName" name="controllerName">
+									</div>
+								</div>
+								<hr class="dashed-line">
+								<div class="row">
+									<div class="form-inline col-xs-12">
+										<label>Serial: {{serialNo}} | Current version: {{version}}</label>
+									</div>
+								</div>
+								<hr class="dashed-line">
+								<div class="row">
+									<div class="form-inline col-xs-12">
+										<label>Time zone (UTC):</label>
+										<select class="form-control" id="rule_mode"
+												ng-model="selectedTimeZone"
+												ng-options="zone.value as zone.text for zone in timeZones"/>
+										</select>
+										<label>,</label>
+										<input type="checkbox" id="summerTime" ng-model="isSummerTime">
+										<label>Summer time</label>
+									</div>
+								</div>
+								<hr class="dashed-line">			
+								<div class="row">
+									<div class="col-xs-1">
+										<input type="checkbox" id="calibratePh" ng-model="calibratePh">
+									</div>
+									<div class="form-inline col-xs-11">
+										<label>Calibrate Ph, m: </label>
+										<input style="width:75px;" type="text" class="form-control" id="ph_m" ng-model="ph_m" name="ph_m">
+										<label>c: </label>
+										<input style="width:75px;" type="text" class="form-control" id="ph_c" ng-model="ph_c" name="ph_c">
+									</div>
+								</div>
+								<hr class="dashed-line">
+								<div class="row">
+									<div class="col-xs-1">
+										<input type="checkbox" id="changedWaterLevel" ng-model="isChangedWaterLevel">
+									</div>
+									<div class ="col-xs-11">
+										<label>Set current level as 0 </label>
+									</div>
+								</div>							
+							</div>
+						</div>
+					</div>
+					<div style="padding:10px;" class="row">
+						<hr style="border: solid 1px white;">
+						<button type="button" class="btn btn-default" ng-click="doSave()">Save</button>
+					</div>
+				</div>			
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+<script>
+	var app = angular.module('myApp', []);
+	app.controller('myCtrl', function($scope, $http, $location) {
+		$scope.isValidated = false;
+		$scope.isAuthorized = false;
+		$scope.failLogin = false;
+		$scope.user = '';
+		$scope.pass = '';
+		$scope.feeder = {};
+		$scope.events = [];
+		$scope.rules = [];
+		$scope.sensors = [];
+		$scope.validate = function(){
+			$http.get("/action?action=validate", {headers: {"Authorization": "Bearer " + localStorage.getItem("token")}})
+			.then(function(response) {
+				$scope.isAuthorized = response.data;
+				$scope.isValidated = true;
+				if($scope.isAuthorized){
+					$scope.loadContent();
+				}
+			}, function(error){
+			$scope.isValidated = true;
+			$scope.isAuthorized = false;});
+		};
+		
+		$scope.validate();
+		
+		$scope.doLogin = function(){
+			var logInCredetials = "&user=" + $scope.user + "&pass=" + $scope.pass;
+			$http.post("/action?action=login", logInCredetials, {headers: {"Content-Type": "application/x-www-form-urlencoded"}})
+			.then(function(response) {
+					localStorage.setItem("token", response.data);
+					$scope.isAuthorized = true;
+					$scope.failLogin = false;
+					$scope.loadContent();
+			}, function(error){
+				$scope.user = '';
+				$scope.pass = '';
+				$scope.failLogin = true;});
+		};
+		
+		$scope.doLogout = function(){
+			$scope.isAuthorized = false;
+			localStorage.removeItem('token');
+		};
+		
+		$scope.buildSensorList=function(){
+			$scope.sensors=[];
+			$scope.sensors.push({"name":"Temperature", "code":0 });
+			$scope.sensors.push({"name":"Level","code":1 });
+			$scope.sensors.push({"name":"Ph", "code":2});
+		}
+		
+		$scope.loadContent = function(){
+			//load general
+			$http.get("/action?action=getGeneralSettings",{headers: {"Authorization": "Bearer " + localStorage.getItem("token")}})
+				.then(function(response) {
+					$scope.isSummerTime = response.data.isSummerTime;
+					$scope.selectedTimeZone = response.data.selectedTimeZone;
+					$scope.isChangedWaterLevel = false;
+					$scope.ph_c = response.data.ph_c;
+					$scope.ph_m = response.data.ph_m;
+					$scope.calibratePh = false;
+					$scope.controllerName = response.data.controllerName;
+					$scope.buildSensorList();
+					$scope.version = response.data.version;
+					$scope.serialNo = response.data.serialNo;
+					$scope.getEvents(0);
+					$scope.getReadings();
+					$scope.getRules();
+					$scope.getSockets();
+					$scope.getFeeding();
+				}, 
+				function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+		};
+		
+		$scope.getFeeding = function(){
+			//feeder			
+			$http.get("/action?action=getFeeder", {headers: {"Authorization": "Bearer " + localStorage.getItem("token")}})
+			.then(function(response) { $scope.feeder = response.data;}, 
+				function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+			//feedingRule
+			$http.get("/action?action=getFeedingRule", {headers: {"Authorization": "Bearer " + localStorage.getItem("token")}})
+				.then(function(response) { $scope.feedingRule = response.data;}, 
+				function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+		};
+		
+		$scope.getSockets = function(){
+			$http.get("/action?action=getSockets", {headers: {"Authorization": "Bearer " + localStorage.getItem("token")}})
+				.then(function(response) { $scope.elements = response.data;}, 
+					function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+		};
+		
+		$scope.getEvents = function(offset){
+			$http.get("/action?action=events&" + offset + "=0&numberOfEvents=15", {headers: {"Authorization": "Bearer " + localStorage.getItem("token")}})
+			.then(function(response) { $scope.events = response.data;}, 
+				function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+		};
+		
+		$scope.getRules = function(){
+			$http.get("/action?action=getRules", {headers: {"Authorization": "Bearer " + localStorage.getItem("token")}})
+			.then(function(response) {$scope.rules = response.data;}, 
+				function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+		};
+		
+		$scope.getReadings = function(){
+			$http.get("/action?action=getSensorsReadings", {headers: {"Authorization": "Bearer " + localStorage.getItem("token")}})
+				.then(function(response){ $scope.sensorsRead = response.data;}, 
+					function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+				
+		};
+		
+		//constants
+		$scope.allSensors = [{"name":"Temperature", "code":0 }, {"name":"Level","code":1 }, {"name":"Ph", "code":2}];
+		$scope.actions = [{"name":"Stop", "code":0 }, {"name":"Start","code":1 }];
+		$scope.operands = [{"name":"Less than", "code":"less" }, {"name":"Greater than","code":"greater" }];
+		$scope.modes = [{"name":"Don't ignore", "code":0}, {"name":"Ignore", "code":1}];
+		$scope.timeZones = [{"value": -12,"text": "(GMT -12:00) Eniwetok, Kwajalein"}, {"value": -11,"text": "(GMT -11:00) Midway Island, Samoa"},
+						   {"value": -10,"text": "(GMT -10:00) Hawaii"},{"value": -9,"text": "(GMT -9:00) Alaska"},
+						   {"value": -8,"text": "(GMT -8:00) Pacific Time (US & Canada)"}, {"value": -7,"text": "(GMT -7:00) Mountain Time (US & Canada)"},
+						   {"value": -6,"text": "(GMT -6:00) Central Time (US & Canada), Mexico City"}, {"value": -5,"text": "(GMT -5:00) Eastern Time (US & Canada), Bogota, Lima"},
+						   {"value": -4,"text": "(GMT -4:00) Atlantic Time (Canada), Caracas, La Paz"}, {"value": -3.5,"text": "(GMT -3:30) Newfoundland"},
+						   {"value": -3,"text": "(GMT -3:00) Brazil, Buenos Aires, Georgetown"}, {"value": -2,"text": "(GMT -2:00) Mid-Atlantic"},
+						   {"value": -1,"text": "(GMT -1:00) Azores, Cape Verde Islands"}, {"value": 0,"text": "(GMT) Western Europe Time, London, Lisbon, Casablanca"},
+						   {"value": 1,"text": "(GMT +1:00) Brussels, Copenhagen, Madrid, Paris"}, {"value": 2,"text": "(GMT +2:00) Bucharest, Athena, South Africa"},
+						   {"value": 3,"text": "(GMT +3:00) Baghdad, Riyadh, Moscow, St. Petersburg"}, {"value": 3.5,"text": "(GMT +3:30) Tehran"},
+						   {"value": 4,"text": "(GMT +4:00) Abu Dhabi, Muscat, Baku, Tbilisi"}, {"value": 4.5,"text": "(GMT +4:30) Kabul"},
+						   {"value": 5,"text": "(GMT +5:00) Ekaterinburg, Islamabad, Karachi, Tashkent"}, {"value": 5.5,"text": "(GMT +5:30) Bombay, Calcutta, Madras, New Delhi"},
+						   {"value": 5.75,"text": "(GMT +5:45) Kathmandu"}, {"value": 6,"text": "(GMT +6:00) Almaty, Dhaka, Colombo"},
+						   {"value": 7,"text": "(GMT +7:00) Bangkok, Hanoi, Jakarta"}, {"value": 8,"text": "(GMT +8:00) Beijing, Perth, Singapore, Hong Kong"},
+						   {"value": 9,"text": "(GMT +9:00) Tokyo, Seoul, Osaka, Sapporo, Yakutsk"}, {"value": 9.5,"text": "(GMT +9:30) Adelaide, Darwin"},
+						   {"value": 10,"text": "(GMT +10:00) Eastern Australia, Guam, Vladivostok"}, {"value": 11,"text": "(GMT +11:00) Magadan, Solomon Islands, New Caledonia"},
+						   {"value": 12,"text": "(GMT +12:00) Auckland, Wellington, Fiji, Kamchatka"}];
+		
+		$scope.doAction = function(action){
+			$http.get("/action?action=" + action, {headers: {"Authorization":"Bearer " +  localStorage.getItem("token")}})
+				.then(function(response) {
+							$http.get("/action?action=events", {headers: {"Authorization":"Bearer " +  localStorage.getItem("token")}})
+								.then(function(response) {$scope.events = response.data;}, function(error){if(error.status === 401){$scope.isAuthorized = false;}});}, 
+					function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+		};
+		
+		$scope.loadMoreEvents = function(){
+			if($scope.events.length < 60){
+				$http.get("/action?action=events&offset=" + $scope.events.length + "&numberOfEvents=15", {headers: {"Authorization": "Bearer " + localStorage.getItem("token")}})
+					.then(function(response) {
+							var returnedEvents = response.data;
+							for (var i = 0; i < returnedEvents.length; i++){
+								$scope.events.push(returnedEvents[i]);
+							}
+						}, 
+				function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+			}			
+		}
+		
+		$scope.doSave = function(){
+			
+			if (confirm("Are you sure you want to make this changes? Note that frecvent changes are wearing off the flash memory! The controller will restart to apply the updates!"))
+			{	
+				var generalParams = '&controllerName=' + $scope.controllerName;				
+				generalParams += '&isSummerTime=' + $scope.isSummerTime;
+				generalParams += '&selectedTimeZone=' + $scope.selectedTimeZone;
+				
+				if($scope.isChangedWaterLevel){
+					generalParams += '&zeroLevel=' + $scope.isChangedWaterLevel;
+				}
+				
+				if($scope.calibratePh){
+					generalParams += '&ph_c=' + $scope.ph_c;
+					generalParams += '&ph_m=' + $scope.ph_m;
+				}
+				
+				var feedingParams = '&name_f=' + $scope.feeder.name;
+				
+				for (var i = 0; i < $scope.feeder.schedules.length; i++)
+				{
+					feedingParams += '&used'+ (i+1) +'_f=' + $scope.feeder.schedules[i].used;
+					feedingParams += '&time'+ (i+1) +'_f=' + $scope.feeder.schedules[i].time;
+					feedingParams += '&duration'+ (i+1) +'_f=' + $scope.feeder.schedules[i].duration;
+				}
+				
+				feedingParams += '&fr_stopMinutes=' + $scope.feedingRule.stopMinutes;
+				feedingParams += '&fr_isStop=' + $scope.feedingRule.isStop;
+				let socketsString="";
+				for (var i = 0; i < $scope.feedingRule.sockets.length; i++)
+				{
+					if(i > 0)
+					{
+						socketsString += '.';
+					}
+					socketsString += $scope.feedingRule.sockets[i];
+				}				
+				feedingParams += '&fr_sockets=' + socketsString;
+				
+				var rulesParams ="";
+				for (var i = 0; i < $scope.rules.length; i++)
+				{
+					rulesParams += '&r'+ i +'_used=' + $scope.rules[i].used;
+					rulesParams += '&r'+ i +'_action=' + $scope.rules[i].action;
+					rulesParams += '&r'+ i +'_socket=' + $scope.rules[i].socket;
+					rulesParams += '&r'+ i +'_operand=' + $scope.rules[i].operand;
+					rulesParams += '&r'+ i +'_value=' + $scope.rules[i].value;
+					rulesParams += '&r'+ i +'_mode=' + $scope.rules[i].mode;
+				}
+				
+				var socketsParams = "";
+				for (var i = 0; i < $scope.elements.length; i++) {
+				 socketsParams += '&name_' + $scope.elements[i].pin +'=' + $scope.elements[i].name;
+					for (var j = 0; j < $scope.elements[i].schedules.length; j++)
+					{
+						socketsParams += '&used_' + $scope.elements[i].pin + '_' + j + '=' + $scope.elements[i].schedules[j].used;
+						socketsParams += '&timeOn_' + $scope.elements[i].pin + '_' + j + '=' + $scope.elements[i].schedules[j].timeOn;
+						socketsParams += '&timeOff_' + $scope.elements[i].pin + '_' + j + '=' + $scope.elements[i].schedules[j].timeOff;
+					}
+				}
+				
+				$http.post("/action?action=updateGeneral", generalParams, {headers: {"Authorization": "Bearer " + localStorage.getItem("token"), "Content-Type": "application/x-www-form-urlencoded"}})
+					.then(function(response) {
+						$http.post("/action?action=updateFeeding", feedingParams, {headers: {"Authorization": "Bearer " + localStorage.getItem("token"), "Content-Type": "application/x-www-form-urlencoded"}})
+							.then(function(response) {
+								$http.post("/action?action=updateRules", rulesParams, {headers: {"Authorization": "Bearer " + localStorage.getItem("token"), "Content-Type": "application/x-www-form-urlencoded"}})
+									.then(function(response) {
+										$http.post("/action?action=updateSockets", socketsParams, {headers: {"Authorization": "Bearer " + localStorage.getItem("token"), "Content-Type": "application/x-www-form-urlencoded"}})
+											.then(function(response) {
+												$http.get("/action?action=restart", {headers: {"Authorization":"Bearer " +  localStorage.getItem("token")}}).then(function(response) {/*nothing*/ }, function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+											}, function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+									}, function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+							}, function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+					}, function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+			};
+			$scope.edit = false;
+		};
+		
+		$scope.doUpdate = function(){
+			
+			if ($scope.updateServer && $scope.updateServer.length >0 &&confirm("Are you sure you want to try updating? The controller will restart to apply the updates!"))
+			{
+				$http.post ("/action?action=update","updateServer=" + encodeURI($scope.updateServer), {headers: {"Authorization":"Bearer " +  localStorage.getItem("token"), "Content-Type": "application/x-www-form-urlencoded"}}).then(function(response) {$scope.getEvents()}, function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+			}
+		};
+		
+		
+		$scope.removeRule=function($index){ 
+			$scope.rules.splice($index,1);     
+		}
+		
+		$scope.addRule=function(){ 
+			$scope.rules.push({"used":false, "action":0, "socket":2, "sensor": 0, "operand":"less", "value":0, "mode":0});     
+		}
+		
+		$scope.removeFeeding=function($index){ 
+			$scope.feeder.schedules.splice($index,1);     
+		}
+		
+		$scope.addFeeding=function(){ 
+			$scope.feeder.schedules.push({"time":"00:00", "used":false});     
+		}
+		
+		$scope.removeSchedule=function($index, socket){ 
+			socket.schedules.splice($index,1);     
+		}
+		
+		$scope.addSchdule=function(socket){ 
+			socket.schedules.push({"timeOn":"00:00", "timeOff":"00:00", "used":false});     
+		}
+		
+		$scope.edit = false;
+		$scope.changeEdit = function()
+		{
+			return $scope.edit = true;
+		}
+		$scope.changeState = function (item){
+			if(item.status == "ON"){
+				$http.get("/action?action=off&pin=" + item.pin, {headers: {"Authorization": "Bearer " + localStorage.getItem("token")}})
+				.then(function(response) {
+					$http.get("/action?action=events", {headers: {"Authorization": "Bearer " + localStorage.getItem("token")}})
+						.then(function(response) {
+						$scope.events = response.data;
+					}, function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+					return item.status=response.data.status;}, function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+				
+			} else {
+				$http.get("/action?action=on&pin=" + item.pin, {headers: {"Authorization": "Bearer " + localStorage.getItem("token")}})
+				.then(function(response) {
+					$http.get("/action?action=events", {headers: {"Authorization":"Bearer " +  localStorage.getItem("token")}})
+						.then(function(response) {
+						$scope.events = response.data;
+					}, function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+					return item.status=response.data.status;}, function(error){if(error.status === 401){$scope.isAuthorized = false;}});
+			}
+		};
+	});
+</script>
+</body>
+</html>  
