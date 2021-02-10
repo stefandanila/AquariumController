@@ -20,6 +20,12 @@ The listed hardware parts should be connected as in CircuitSchematics.png, an wo
 ## Software setup
 To install the sketches use Arduino IDE, install the ESP board in Settings -> Additional Boards Manager URLs. The sketches make use of the following libraries: NTPClient (https://github.com/arduino-libraries/NTPClient), DallasTemperature (https://github.com/milesburton/Arduino-Temperature-Control-Library) and NewPing (https://bitbucket.org/teckel12/arduino-new-ping/wiki/Home).
 
+## Configuring the network setting
+### From the code
+Make changes in esp8266/data/network.config to suit your network configuration 
+### From UI
+Use your smart phone and make a hostspot with ssid: config and password: 12345678 , the monitor the hostspot for connected devices copy the ip address, and use a browser to connect to that ip. A network settings page is available if the file esp8266/data/network.config is not uploaded to esp or if it is empty.
+
 # Disclaimer
 This project is something I put togher to control and monitor my personal aquarium, it is my first project with arduino/esp, I am sure that lots of thing can be done better and I am ager to learn them from your input. This project can be use as it is or modify it to suit your need, for me it is working since summer of 2019.
 
