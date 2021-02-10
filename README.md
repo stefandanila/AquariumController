@@ -1,5 +1,5 @@
 # Aquarium Controller
-Aquarium controller made with ESP8266 ESP01 and Aduino Nano. The ESP8266 ESP01 act as a http server and as a routines manager and the Aduino Nano as an executor, they comunicate over Serial. The controller can command 8 AC sockets, can read sensors like: temperature, ph and ultrasound for distance (water level). Based on the sensor reads there can be set rulles to command the sockets. The UI is made with AngularJs and Boostrap, the communication between fron-end and back-end is made with RestAPI calls. The configuration is stored in files on ESP8266 ESP01.
+This aquarium controller is made with ESP8266 ESP01 and Aduino Nano. The ESP8266 ESP01 act as a http server and as a routines manager and the Aduino Nano as an executor, they comunicate over Serial. The controller can command 8 AC sockets, can read sensors like: temperature, ph and ultrasound for distance (water level). Based on the sensor reads there can be set rulles to command the sockets. The UI is made with AngularJs and Boostrap, the communication between fron-end and back-end is made with RestAPI calls. The configuration is stored in files on ESP8266 ESP01.
 
 ## Hardware parts
 The listed hardware parts should be connected as in CircuitSchematics.png, an working example can be seen in HarwareExample.jpg. Warning, working with high voltage without proper knowlege and protection equipment can kill you.
@@ -16,3 +16,10 @@ The listed hardware parts should be connected as in CircuitSchematics.png, an wo
 - 1 x Motor DC 3V-6V with gearbox 1:48
 - 8 x AC Modular Sockets
 - Wires
+
+## Software setup
+To install the sketches use Arduino IDE, install the ESP board in Settings -> Additional Boards Manager URLs. The sketches make use of the following libraries: NTPClient (https://github.com/arduino-libraries/NTPClient), DallasTemperature (https://github.com/milesburton/Arduino-Temperature-Control-Library) and NewPing (https://bitbucket.org/teckel12/arduino-new-ping/wiki/Home).
+
+# Disclaimer
+This project is something I put togher to control an monitor my personal aquarium, it is my first project with arduino/esp, I am sure that lots of thing can be done better and I am ager to learn them from your input. This project can be use as it is or modify it to suit your need, for me it is working since summer of 2019.
+
