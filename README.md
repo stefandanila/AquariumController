@@ -21,5 +21,5 @@ The listed hardware parts should be connected as in CircuitSchematics.png, an wo
 To install the sketches use Arduino IDE, install the ESP board in Settings -> Additional Boards Manager URLs. The sketches make use of the following libraries: NTPClient (https://github.com/arduino-libraries/NTPClient), DallasTemperature (https://github.com/milesburton/Arduino-Temperature-Control-Library) and NewPing (https://bitbucket.org/teckel12/arduino-new-ping/wiki/Home).
 
 # Disclaimer
-This project is something I put togher to control an monitor my personal aquarium, it is my first project with arduino/esp, I am sure that lots of thing can be done better and I am ager to learn them from your input. This project can be use as it is or modify it to suit your need, for me it is working since summer of 2019.
+This project is something I put togher to control and monitor my personal aquarium, it is my first project with arduino/esp, I am sure that lots of thing can be done better and I am ager to learn them from your input. This project can be use as it is or modify it to suit your need, for me it is working since summer of 2019.
 
