@@ -4,10 +4,9 @@
 #include <WiFiUdp.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
-#include <FS.h>
-
- //this make your device vulnerable when exposed to public, used only in dev
 #include <ESP8266HTTPUpdateServer.h>
+#include <Time.h>
+#include <FS.h>
 
 
 ESP8266WebServer server(80);
@@ -25,7 +24,7 @@ NTPClient timeClient(ntpUDP);
 #define SOCKET_EIGHT 9
 
 #define FEEDER_R1 11
-#define LEVEL 10
+#define LEVEL 10//not used
 
 int myStaticIp [4] = {192, 168, 0, 51};
 int myGateway [4] = {192, 168, 0, 1};
@@ -35,7 +34,7 @@ int firstDot;
 int secondDot;
 int thirdDot;
 
-const char* deviceName = "Aquarium v3.5";
+const char* deviceName = "Aquarium v3.6";
 String ssid = "config";
 String password = "12345678";
 String userName = "admin";
@@ -45,8 +44,10 @@ const char* host = "esp8266-webupdate";
 
 String localToken = String(ESP.getChipId()) + String(ESP.getFreeHeap() * ESP.random() + millis());
 long lastTokenUpdate = 0;
+long lastManualAction = 0;
+long lastStateCheck = 0;
 
-int softwareVersion = 10;
+int softwareVersion = 11;
 
 typedef struct {
   boolean defined;
@@ -98,8 +99,8 @@ int isSummerTime = 1; //1 -> true, 0 ->false
 float timeZone = 2;
 
 float zeroLevel = 0;
-float ph_c = 0;
-float ph_m = 0;
+float ph_c = 22.10;
+float ph_m = -4.51;
 
 boolean temperatureRuleIsPresent =  false;
 boolean levelRuleIsPresent = false;
@@ -159,11 +160,13 @@ void handleActionRequest() {
           if (action.equals("on")) {
             turnOn(pin);
             response = "{\"status\":\"ON\"}";
+            lastManualAction = millis();
             addEvent("Manual: ON " + String(getName(pin)));
           }
           if (action.equals("off")) {
             turnOff(pin);
             response = "{\"status\":\"OFF\"}";
+            lastManualAction = millis();
             addEvent("Manual: OFF " + String(getName(pin)));
           }
 
@@ -267,7 +270,8 @@ void handleActionRequest() {
         }
       }
     }
-    //this need to be protected somehow
+    
+   //this need to be protected somehow
     if (action.equals("updateNetwork") && ssid.equals("config") && password.equals("12345678")) {
       response = updateNetwork();
     }
@@ -389,11 +393,10 @@ String getSensorsReadings() {
   return response;
 }
 
-//this is useful when using relays NC (Nominal Close) for things that will be on most of the time
 boolean isNO(int pin) {
-  if (pin == SOCKET_EIGHT) {
+  /*if (pin == SOCKET_EIGHT) {
     return false;
-  }
+    }*/
   return true;
 }
 
@@ -424,7 +427,30 @@ float getSensor(String name) {
 }
 
 String getStatus(int pin) {
-  String response = (isOn[pin] == true ? "ON" : "OFF");
+  String response = "UNKNOWN";
+  /*readAllFromSerial();
+    Serial.println("digitalRead("+String(pin)+")");
+    long beginTime = millis();
+    while((!Serial.available() > 0) && (millis() - beginTime < 3000))
+    {
+  	delay(50);
+    }
+    if(Serial.available() > 0){
+      if(Serial.readString() == "LOW"){
+      if(isNO(pin)){
+        response = "ON";
+      } else {
+        response = "OFF";
+      }
+    } else {
+      if(isNO(pin)){
+        response = "OFF";
+      } else {
+        response = "ON";
+      }
+    }
+    }*/
+  response = (isOn[pin] == true ? "ON" : "OFF");
   return response;
 }
 
@@ -494,15 +520,15 @@ String jsonTime(int time) {
 void handleWifi() {
   //Static IP address configuration
   loadWifiSettings();
-  IPAddress gateway(myGateway[0], myGateway[1], myGateway[2], myGateway[3]);
-  IPAddress subnet(mySubnet[0], mySubnet[1], mySubnet[2], mySubnet[3]);
-  IPAddress dns(myDns[0], myDns[1], myDns[2], myDns[3]);
-  IPAddress staticIP(myStaticIp[0], myStaticIp[1], myStaticIp[2], myStaticIp[3]);
+  IPAddress gateway(myGateway[0], myGateway[1], myGateway[2], myGateway[3]);//IP Address of your WiFi Router (Gateway)
+  IPAddress subnet(mySubnet[0], mySubnet[1], mySubnet[2], mySubnet[3]);//Subnet mask
+  IPAddress dns(myDns[0], myDns[1], myDns[2], myDns[3]);//DNS
+  IPAddress staticIP(myStaticIp[0], myStaticIp[1], myStaticIp[2], myStaticIp[3]); //ESP static ip
 
   WiFi.disconnect();
   delay(1000);
-  WiFi.hostname(deviceName); 
-  WiFi.mode(WIFI_STA);
+  WiFi.hostname(deviceName);      // DHCP Hostname (useful for finding device for static lease)
+  WiFi.mode(WIFI_STA); //WiFi mode station (connect to wifi router only)
   if (!(ssid.equals("config") && password.equals("12345678"))) {
     WiFi.config(staticIP, dns, gateway, subnet);
   }
@@ -510,7 +536,9 @@ void handleWifi() {
   WiFi.setSleepMode(WIFI_NONE_SLEEP);
   WiFi.begin(ssid, password);
 
-  while (WiFi.status() != WL_CONNECTED) {
+  int maxWaitTime = 30000;
+  while ( maxWaitTime > 0 && WiFi.status() != WL_CONNECTED) {
+    maxWaitTime = maxWaitTime - 500;
     delay(500);
   }
 }
@@ -625,7 +653,8 @@ void addEvent(String event) {
   for (byte i = maxEvents - 1; i > 0; i = i - 1) {
     events[i] = events[i - 1];
   }
-  String entry = "{\"time\":\"" + String(timeClient.getFormattedTime()) + "\",\"event\":\"" + event + "\"}";
+
+  String entry = "{\"time\":\"" + getStringDayOfWeek(getDayOfWeek()) + " " + String(timeClient.getFormattedTime()) + "\",\"event\":\"" + event + "\"}";
   events[0] = entry;
 }
 
@@ -773,6 +802,23 @@ void startupElement(int now, Socket item) {
   readAllFromSerial();
 }
 
+void systemStateEnforcer(int now) {
+  if ((millis() - lastStateCheck > (30 * 60000)) && (millis() - lastManualAction > (90 * 60000))) {
+    for (byte i = 0; i < 8; i ++) {
+      if (isInInterval(sockets[i].pin, now) && !isOn[sockets[i].pin]) {
+        addEvent("System state enforcer: Turning on " + sockets[i].name + "!");
+        turnOn(sockets[i].pin);
+      } else if (!isInInterval(sockets[i].pin, now) && isOn[sockets[i].pin]) {
+        addEvent("System state enforcer: Turning off " + sockets[i].name + "!");
+        turnOff(sockets[i].pin);
+      }
+      delay(500);
+      readAllFromSerial();
+    }
+    lastStateCheck = millis();
+  }
+}
+
 boolean isInInterval(int pin, long now) {
   for (byte i = 0; i < 8; i ++) { //the size of the structure
     if (sockets[i].pin == pin) {
@@ -813,6 +859,32 @@ String getName(int pin) {
   return "UNKNOWN";
 }
 
+String getStringDayOfWeek(int day) {
+  if (day == 0) {
+    return "Monday";
+  } else if (day == 1) {
+    return "Tuesday";
+  } else if (day == 2) {
+    return "Wendnesday";
+  } else if (day == 3) {
+    return "Thursday";
+  } else if (day == 4) {
+    return "Friday";
+  } else if (day == 5) {
+    return "Saturday";
+  } else {
+    return "Sunday";
+  }
+}
+
+int getDayOfWeek() {
+  // Convert to number of days since 1 Jan 1970
+  int days_since_epoch = timeClient.getEpochTime() / 86400;
+  // 1 Jan 1970 was a Thursday, so add 4 so Sunday is day 0, and mod 7
+  int day_of_week = (days_since_epoch + 3) % 7;
+  return day_of_week;
+}
+
 void readAllFromSerial() {
   while (Serial.available() > 0) {
     Serial.readString();
@@ -820,6 +892,7 @@ void readAllFromSerial() {
 }
 
 String updateSockets() {
+  //sockets
   String socketsToSave = "";
   for (byte i = 0; i < 8; i ++) { //the size of the structure
     socketsToSave += addParam("name_" + String(sockets[i].pin), server.arg("name_" + String(sockets[i].pin)));
@@ -853,6 +926,8 @@ String updateSockets() {
 }
 
 String updateRules() {
+  //rules
+
   String rulesToSave = "";
   writeToFile("/rules.config", rulesToSave, false);
   for (byte i = 0; i < 19; i ++) {
@@ -927,6 +1002,7 @@ String updateFeeding() {
 }
 
 String updateGeneral() {
+  //general
   String generalToSave = addParam("controllerName", server.arg("controllerName"));
   generalToSave += addParam("isSummerTime", String(server.arg("isSummerTime").equals("true")));
   generalToSave += addParam("timeZone", server.arg("selectedTimeZone"));
@@ -993,6 +1069,7 @@ void loadGeneral() {
   }
 
   if (conf.length() > 0) {
+    //general
     isSummerTime = getBoolean(conf, "isSummerTime");
     timeZone = getInt(conf, "timeZone");
     controllerName = getMyString(conf, "controllerName");
@@ -1030,6 +1107,7 @@ void loadRules() {
 }
 
 void loadSockets() {
+
   File file = SPIFFS.open("/sockets.config", "r");
   String conf = "";
   if (file) {
@@ -1200,9 +1278,8 @@ void setup(void) {
   }
 
   MDNS.begin(host);
-  
-  //this make your device vulnerable when exposed to public, used only in dev
-  httpUpdater.setup(&server);
+  //httpUpdater.setup(&server);
+  httpUpdater.setup(&server, "/update", userName, userPass);
 
   server.on("/action", handleActionRequest);
   server.begin();
@@ -1226,11 +1303,11 @@ void loop(void) {
 
   if (!(ssid.equals("config") && password.equals("12345678"))) {
     if (WiFi.status() != WL_CONNECTED) {
-      delay(60000);
       handleWifi();
     }
     int thisMoment  = getCurrentTime();
     handleElements(thisMoment);
     handleRules(thisMoment);
+    systemStateEnforcer(thisMoment);
   }
 }
